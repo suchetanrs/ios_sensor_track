@@ -3,7 +3,7 @@ options:
   bundleIdPrefix: com.example
   objectVersion: 56          # Xcode 15-compatible format
   deploymentTarget:
-    iOS: "15.0"
+    iOS: "16.0"              # Swift Charts (hypnogram) + .asleepUnspecified need iOS 16
 targets:
   SensorTrack:
     type: application
@@ -16,12 +16,27 @@ targets:
         CFBundleDisplayName: SensorTrack
         UILaunchScreen: {}
         UIBackgroundModes:
-          - location
+          - location          # used by the (untouched) Obsidian sync keep-alive
+          - audio             # keeps the sleep tracker alive overnight when the mic is on
         NSLocationWhenInUseUsageDescription: "Keeps the vault sync running while you use the app."
         NSLocationAlwaysAndWhenInUseUsageDescription: "Keeps the vault sync running periodically in the background."
+        NSMicrophoneUsageDescription: "Listens for snoring and breathing while you sleep to enrich your sleep report. Audio is analyzed on-device and is never recorded or sent anywhere."
+        NSHealthShareUsageDescription: "Reads sleep data so your recorded nights can be shown alongside Apple Health."
+        NSHealthUpdateUsageDescription: "Writes the sleep and wake times this app detects to Apple Health."
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.sensortrack
         MARKETING_VERSION: "2.0"
         CURRENT_PROJECT_VERSION: "2"
         TARGETED_DEVICE_FAMILY: "1,2"
+  SensorTrackTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+    dependencies:
+      - target: SensorTrack
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.sensortrack.tests
+        GENERATE_INFOPLIST_FILE: YES

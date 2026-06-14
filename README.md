@@ -65,3 +65,41 @@ low-power **location keep-alive** to stay running, so:
   or a fine-grained PAT with Contents: Read and write).
 - Very large vaults are re-hashed each cycle; fine for typical note vaults.
 - A free-signed build's signature expires after 7 days — re-run AltServer to refresh.
+
+---
+
+# Sleep Tracker
+
+The app's second feature (home screen → **Sleep Tracker**) is a phone-on-mattress
+sleep tracker. Put the phone on the mattress near your pillow, plugged in, and tap
+**Start tracking**. All sleep code lives in `Sources/Sleep/` and is independent of the
+Obsidian sync.
+
+## How it works
+
+- **Actigraphy (movement).** The accelerometer (Core Motion `userAcceleration`, gravity
+  removed) is sampled at ~10 Hz and bucketed into **60-second epochs** — only the
+  per-epoch activity *count* is kept, never raw samples. Each epoch is scored
+  asleep/awake with the **Cole-Kripke** algorithm, then cleaned up with **Webster
+  rescoring** rules.
+- **Sound (optional).** With the mic toggle on, Apple's built-in **SoundAnalysis**
+  classifier flags **snoring/breathing** on-device (nothing is recorded or uploaded).
+  The active audio session also keeps the app alive overnight with the screen locked.
+- **Background.** Mic off → keep the app open (the screen stays on). Mic on → the screen
+  can lock; the `audio` background mode keeps tracking alive.
+- **Output.** Each night is saved on-device (`Documents/SleepSessions/`) with a
+  **hypnogram** (Swift Charts), sleep efficiency, onset latency, WASO, awakenings, and
+  snore minutes. Sessions are also written to **Apple Health** (`sleepAnalysis`).
+
+## Limits / notes
+
+- Phone-only actigraphy distinguishes **sleep vs. wake**, not sleep *stages*
+  (REM/deep), so Health gets `inBed` / `asleepUnspecified` / `awake` only.
+- The Cole-Kripke weights were tuned for research wrist counts; the scale/threshold in
+  `ColeKripkeClassifier` are exposed for calibration against real phone data.
+- **HealthKit** needs the HealthKit entitlement, which a *free* sideload profile can't
+  grant — the writer fails gracefully without it; enabling it for real needs a paid
+  Apple Developer account + the HealthKit capability on the target.
+- Pure engine logic (aggregator, Cole-Kripke, rescoring, metrics) is unit-tested in
+  `Tests/` — run with `xcodebuild test` on a Mac/simulator (the cloud build only
+  archives the app).
