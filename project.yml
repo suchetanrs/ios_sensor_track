@@ -1,6 +1,7 @@
 name: SensorTrack
 options:
   bundleIdPrefix: com.example
+  objectVersion: 56          # Xcode 15-compatible format (runner has Xcode 15.4)
   deploymentTarget:
     iOS: "15.0"
 targets:
