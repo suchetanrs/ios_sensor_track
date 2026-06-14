@@ -199,7 +199,7 @@ struct SyncEngine {
 
         var conflicts: [String] = []
         var deleteRemote: [String] = []
-        var pulled = 0
+        var pulled: [String] = []
 
         // --- Reconcile each path using the last-synced manifest as the merge base ---
         for path in Set(base.keys).union(remote.keys).union(localSHA.keys) {
@@ -216,10 +216,11 @@ struct SyncEngine {
                 let dest = root.appendingPathComponent(path)
                 if let r = r {
                     try writeFile(dest, await client.blob(r))
+                    pulled.append("\(l == nil ? "+" : "~") \(path)")
                 } else {
                     try? FileManager.default.removeItem(at: dest)
+                    pulled.append("- \(path)")
                 }
-                pulled += 1
             } else if remoteChanged && localChanged {
                 // Both sides changed → conflict. Keep local; save remote as a copy.
                 if let r = r {
@@ -248,7 +249,12 @@ struct SyncEngine {
         }
 
         if entries.isEmpty {
-            logs.append(pulled > 0 ? "Pulled \(pulled) change(s); nothing to push." : "Up to date.")
+            if pulled.isEmpty {
+                logs.append("Up to date.")
+            } else {
+                logs.append("Pulled \(pulled.count) change(s); nothing to push.")
+                logs.append(contentsOf: pulled.map { "  \($0)" })
+            }
             return SyncResult(manifest: finalSHA, head: remoteHead, conflicts: conflicts, logs: logs)
         }
 
@@ -260,7 +266,10 @@ struct SyncEngine {
             return SyncResult(manifest: base, head: remoteHead, conflicts: conflicts, logs: logs)
         }
 
-        if pulled > 0 { logs.append("Pulled \(pulled) change(s).") }
+        if !pulled.isEmpty {
+            logs.append("Pulled \(pulled.count) change(s).")
+            logs.append(contentsOf: pulled.map { "  \($0)" })
+        }
         logs.append("Pushed \(entries.count) change(s).")
         return SyncResult(manifest: finalSHA, head: newCommit, conflicts: conflicts, logs: logs)
     }
