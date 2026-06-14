@@ -20,8 +20,8 @@ jobs:
       - name: Build (no code signing)
         run: |
           xcodebuild \
-            -project VaultSync.xcodeproj \
-            -scheme VaultSync \
+            -project SensorTrack.xcodeproj \
+            -scheme SensorTrack \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath build \
@@ -32,11 +32,11 @@ jobs:
       - name: Package unsigned .ipa
         run: |
           mkdir -p Payload
-          cp -R build/Build/Products/Release-iphoneos/VaultSync.app Payload/
-          zip -r VaultSync.ipa Payload
+          cp -R build/Build/Products/Release-iphoneos/SensorTrack.app Payload/
+          zip -r SensorTrack.ipa Payload
 
       - name: Upload .ipa artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VaultSync-ipa
-          path: VaultSync.ipa
+          name: SensorTrack-ipa
+          path: SensorTrack.ipa

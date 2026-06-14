@@ -1,4 +1,4 @@
-# VaultSync
+# SensorTrack
 
 A personal iOS app that keeps an Obsidian vault in sync with a GitHub repo. It
 periodically **pulls** remote changes, **warns via a notification on merge
@@ -47,7 +47,7 @@ low-power **location keep-alive** to stay running, so:
 1. Push the **contents** of this folder to a **public** GitHub repo so `project.yml`
    and `.github/` are at the repo root.
 2. GitHub Actions builds it (Actions → *Build iOS* → run/auto). Download the
-   **VaultSync-ipa** artifact and unzip to `VaultSync.ipa`.
+   **SensorTrack-ipa** artifact and unzip to `SensorTrack.ipa`.
 3. Sideload with AltServer-Linux (free Apple ID).
 4. On the phone: enable **Developer Mode** (Settings → Privacy & Security), then
    **Trust** your Apple ID cert under VPN & Device Management.

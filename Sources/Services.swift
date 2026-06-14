@@ -4,7 +4,7 @@ import CoreLocation
 
 /// Stores the GitHub token in the device Keychain (not in UserDefaults / plain files).
 enum Keychain {
-    private static let service = "com.example.vaultsync"
+    private static let service = "com.example.sensortrack"
     private static let account = "github-token"
 
     static func set(_ token: String) {

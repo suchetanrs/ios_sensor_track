@@ -171,7 +171,7 @@ final class AppState: ObservableObject {
                 if !result.conflicts.isEmpty {
                     let list = result.conflicts.joined(separator: ", ")
                     addLog("⚠️ Merge conflict: \(list)")
-                    Notifier.notify(title: "VaultSync — merge conflict",
+                    Notifier.notify(title: "SensorTrack — merge conflict",
                                     body: "Conflicts in: \(list). Remote copies were saved alongside your files.")
                 }
                 lastSync = Date()

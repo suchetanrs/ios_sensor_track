@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct VaultSyncApp: App {
+struct SensorTrackApp: App {
     @StateObject private var state = AppState()
 
     var body: some Scene {

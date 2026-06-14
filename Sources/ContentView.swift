@@ -63,7 +63,7 @@ struct SyncView: View {
                 }
                 .listStyle(.plain)
             }
-            .navigationTitle("VaultSync")
+            .navigationTitle("SensorTrack")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Clear") { state.clearLog() }

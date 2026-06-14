@@ -1,11 +1,11 @@
-name: VaultSync
+name: SensorTrack
 options:
   bundleIdPrefix: com.example
   objectVersion: 56          # Xcode 15-compatible format
   deploymentTarget:
     iOS: "15.0"
 targets:
-  VaultSync:
+  SensorTrack:
     type: application
     platform: iOS
     sources:
@@ -13,7 +13,7 @@ targets:
     info:
       path: Info.plist
       properties:
-        CFBundleDisplayName: VaultSync
+        CFBundleDisplayName: SensorTrack
         UILaunchScreen: {}
         UIBackgroundModes:
           - location
@@ -21,7 +21,7 @@ targets:
         NSLocationAlwaysAndWhenInUseUsageDescription: "Keeps the vault sync running periodically in the background."
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.vaultsync
-        MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.sensortrack
+        MARKETING_VERSION: "2.0"
+        CURRENT_PROJECT_VERSION: "2"
         TARGETED_DEVICE_FAMILY: "1,2"

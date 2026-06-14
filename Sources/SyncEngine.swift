@@ -53,7 +53,7 @@ struct GitHubClient {
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         req.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
-        req.setValue("VaultSync", forHTTPHeaderField: "User-Agent")
+        req.setValue("SensorTrack", forHTTPHeaderField: "User-Agent")
         if let json = json {
             req.httpBody = try JSONSerialization.data(withJSONObject: json)
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -308,7 +308,7 @@ struct SyncEngine {
         return url.deletingLastPathComponent().appendingPathComponent(name)
     }
 
-    private func commitMessage() -> String { "VaultSync \(Self.stamp())" }
+    private func commitMessage() -> String { "SensorTrack \(Self.stamp())" }
 
     private static func stamp() -> String {
         let f = DateFormatter()
