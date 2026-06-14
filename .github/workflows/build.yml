@@ -1,0 +1,42 @@
+name: Build iOS (unsigned IPA)
+
+on:
+  push:
+  workflow_dispatch:   # lets you run it manually from the Actions tab
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build (no code signing)
+        run: |
+          xcodebuild \
+            -project SensorTrack.xcodeproj \
+            -scheme SensorTrack \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Package unsigned .ipa
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/SensorTrack.app Payload/
+          zip -r SensorTrack.ipa Payload
+
+      - name: Upload .ipa artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SensorTrack-ipa
+          path: SensorTrack.ipa
