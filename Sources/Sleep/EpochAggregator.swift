@@ -20,13 +20,18 @@ final class EpochAggregator {
     let deadband: Double            // ignore jitter below this (gravity-removed |accel|, in g)
 
     private(set) var startTime: TimeInterval?
-    private var currentIndex = 0
+    private let baseIndex: Int      // epoch index of the first epoch this run produces
+    private var currentIndex: Int
     private var currentSum = 0.0
     private var started = false
 
-    init(epochLength: TimeInterval = 60, deadband: Double = 0.02) {
+    /// `startIndex` lets a recovered session keep numbering epochs where it left off, so
+    /// timestamps stay aligned to the original session start.
+    init(epochLength: TimeInterval = 60, deadband: Double = 0.02, startIndex: Int = 0) {
         self.epochLength = epochLength
         self.deadband = deadband
+        self.baseIndex = startIndex
+        self.currentIndex = startIndex
     }
 
     /// Fold one movement magnitude (e.g. |userAcceleration|) sampled at `timestamp`
@@ -39,7 +44,7 @@ final class EpochAggregator {
         started = true
 
         let elapsed = timestamp - startTime!
-        let target = max(0, Int(elapsed / epochLength))
+        let target = baseIndex + max(0, Int(elapsed / epochLength))
 
         var finalized: [Epoch] = []
         while target > currentIndex {

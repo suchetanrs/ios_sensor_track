@@ -1,19 +1,19 @@
 import SwiftUI
 
-/// Entry point for the Sleep Tracker feature (pushed from the home screen). Owns the
-/// `SleepTracker` and shows the live "tonight" screen, with a button into history.
+/// Entry point for the Sleep Tracker feature (pushed from the home screen). The
+/// `SleepTracker` is owned at the app level (see `SensorTrackApp`) and read from the
+/// environment, so a session survives navigating away and back.
 struct SleepTrackerView: View {
-    @StateObject private var tracker = SleepTracker()
+    @EnvironmentObject var tracker: SleepTracker
 
     var body: some View {
         SleepLiveView()
-            .environmentObject(tracker)
             .navigationTitle("Sleep Tracker")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink {
-                        SleepHistoryView().environmentObject(tracker)
+                        SleepHistoryView()
                     } label: {
                         Image(systemName: "calendar")
                     }

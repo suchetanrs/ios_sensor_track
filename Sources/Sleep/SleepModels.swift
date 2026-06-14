@@ -43,6 +43,26 @@ struct SleepMetrics: Codable {
     var snoreMinutes: Double = 0
 }
 
+/// Raw, pre-classification epoch data captured live. Codable so an in-progress session
+/// can be checkpointed to disk and recovered if the app is killed mid-night.
+struct RawEpoch: Codable {
+    var index: Int
+    var activity: Double
+    var start: Date
+}
+
+/// A sleep session still in progress, persisted incrementally (once per epoch). If the
+/// app is terminated, this is what lets the next launch recover and resume the night
+/// instead of losing it.
+struct ActiveSleepSession: Codable {
+    var id: UUID
+    var start: Date
+    var epochLength: TimeInterval
+    var micEnabled: Bool
+    var epochs: [RawEpoch]
+    var soundEvents: [SoundEvent]
+}
+
 /// One recorded night.
 struct SleepSession: Codable, Identifiable {
     var id = UUID()

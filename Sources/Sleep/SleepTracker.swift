@@ -4,6 +4,11 @@ import UIKit
 /// Coordinates a sleep session end-to-end: accelerometer → epoch aggregator (live),
 /// optional microphone snore/breathing detection, then on stop runs Cole-Kripke +
 /// rescoring, computes metrics, persists the night, and writes it to Apple Health.
+///
+/// The in-progress session is checkpointed to disk once per epoch, so if the app is
+/// terminated (memory pressure, force-quit, crash) the next launch recovers and resumes
+/// the night rather than losing it. Owned at the app level so it also survives
+/// navigation within the app.
 @MainActor
 final class SleepTracker: ObservableObject {
 
@@ -14,7 +19,7 @@ final class SleepTracker: ObservableObject {
     @Published var currentActivity: Double = 0
     @Published var liveState: SleepState = .awake
     @Published var snoreCount = 0
-    @Published var micEnabled = false
+    @Published var micEnabled = true   // snore/breathing detection on by default
     @Published var statusMessage = "Ready"
 
     /// Saved nights, newest first.
@@ -29,14 +34,23 @@ final class SleepTracker: ObservableObject {
     private let health = HealthKitWriter()
 
     private var aggregator: EpochAggregator?
-    private var rawEpochs: [(index: Int, activity: Double, start: Date)] = []
+    private var rawEpochs: [RawEpoch] = []
     private var soundEvents: [SoundEvent] = []
+    private var sessionID = UUID()
     private var latestMagnitude = 0.0
     private var uiTimer: Timer?
 
     init() {
         sessions = store.loadAll()
+        wireCallbacks()
 
+        // If a session was in progress when the app was last terminated, pick it back up.
+        if let active = store.loadActive() {
+            resume(active)
+        }
+    }
+
+    private func wireCallbacks() {
         feeder.onSample = { [weak self] magnitude, timestamp in
             Task { @MainActor in self?.handleSample(magnitude, timestamp) }
         }
@@ -51,14 +65,24 @@ final class SleepTracker: ObservableObject {
     // MARK: - Microphone opt-in
 
     func setMic(_ on: Bool) {
-        guard on else { micEnabled = false; sound.stop(); return }
+        micEnabled = on
+        if on {
+            if isTracking { beginSoundDetection() }
+        } else {
+            sound.stop()
+        }
+    }
+
+    /// Requests mic permission (no-op prompt once granted) and starts detection.
+    /// On denial, turns the toggle off and explains why.
+    private func beginSoundDetection() {
         SoundDetector.requestPermission { [weak self] granted in
             guard let self else { return }
-            self.micEnabled = granted
-            if !granted {
-                self.statusMessage = "Microphone permission denied"
-            } else if self.isTracking {
+            if granted {
                 try? self.sound.start()
+            } else {
+                self.micEnabled = false
+                self.statusMessage = "Snore detection off (no mic permission)"
             }
         }
     }
@@ -72,6 +96,7 @@ final class SleepTracker: ObservableObject {
             return
         }
 
+        sessionID = UUID()
         aggregator = EpochAggregator(epochLength: epochLength)
         rawEpochs = []
         soundEvents = []
@@ -83,8 +108,72 @@ final class SleepTracker: ObservableObject {
         isTracking = true
         statusMessage = "Tracking…"
 
+        beginCapture()
+        checkpoint()   // mark the session active immediately (covers a kill in minute 1)
+    }
+
+    func stop() {
+        guard isTracking, let start = startDate else { return }
+        endCapture()
+        isTracking = false
+
+        if let last = aggregator?.finish() {
+            appendEpoch(index: last.index, activity: last.activity, sessionStart: start)
+        }
+        aggregator = nil
+
+        let session = buildSession(start: start, end: Date())
+        store.save(session)
+        store.clearActive()              // night finished — no recovery needed
+        sessions.insert(session, at: 0)
+        statusMessage = "Saved \(timeString(session.metrics.totalSleepTime)) of sleep"
+
+        if health.isAvailable { health.write(session: session) }
+    }
+
+    func delete(_ session: SleepSession) {
+        store.delete(session)
+        sessions.removeAll { $0.id == session.id }
+    }
+
+    // MARK: - Recovery
+
+    /// Restore a session that was interrupted by app termination and keep tracking it.
+    /// Any time the app was dead is filled with zero-activity (still) epochs so the
+    /// timeline stays continuous from the original start.
+    private func resume(_ active: ActiveSleepSession) {
+        guard feeder.isAvailable else { return }
+
+        sessionID = active.id
+        rawEpochs = active.epochs
+        soundEvents = active.soundEvents
+        snoreCount = soundEvents.filter { $0.kind == .snoring }.count
+        micEnabled = active.micEnabled
+        startDate = active.start
+
+        // Bridge the gap between the last recorded epoch and now.
+        let lastIndex = rawEpochs.last?.index ?? -1
+        let nowIndex = max(0, Int(Date().timeIntervalSince(active.start) / epochLength))
+        let baseIndex = max(nowIndex, lastIndex + 1)
+        for idx in (lastIndex + 1)..<baseIndex {
+            rawEpochs.append(RawEpoch(index: idx, activity: 0,
+                                      start: active.start.addingTimeInterval(Double(idx) * epochLength)))
+        }
+
+        aggregator = EpochAggregator(epochLength: epochLength, startIndex: baseIndex)
+        isTracking = true
+        statusMessage = "Resumed your sleep session"
+        liveState = classify(rawEpochs.map { $0.activity }).last ?? .awake
+
+        beginCapture()
+        checkpoint()
+    }
+
+    // MARK: - Capture helpers
+
+    private func beginCapture() {
         feeder.start()
-        if micEnabled { try? sound.start() }
+        if micEnabled { beginSoundDetection() }
         if health.isAvailable { health.requestAuthorization() }
 
         // Keep the screen awake so the app stays active even without the mic keep-alive.
@@ -97,46 +186,37 @@ final class SleepTracker: ObservableObject {
         uiTimer = timer
     }
 
-    func stop() {
-        guard isTracking, let start = startDate else { return }
-
+    private func endCapture() {
         feeder.stop()
         sound.stop()
         uiTimer?.invalidate(); uiTimer = nil
         UIApplication.shared.isIdleTimerDisabled = false
-        isTracking = false
-
-        if let last = aggregator?.finish() {
-            rawEpochs.append((last.index, last.activity,
-                              start.addingTimeInterval(Double(last.index) * epochLength)))
-        }
-        aggregator = nil
-
-        let session = buildSession(start: start, end: Date())
-        store.save(session)
-        sessions.insert(session, at: 0)
-        statusMessage = "Saved \(timeString(session.metrics.totalSleepTime)) of sleep"
-
-        if health.isAvailable { health.write(session: session) }
-    }
-
-    func delete(_ session: SleepSession) {
-        store.delete(session)
-        sessions.removeAll { $0.id == session.id }
     }
 
     // MARK: - Internals
 
     private func handleSample(_ magnitude: Double, _ timestamp: TimeInterval) {
         latestMagnitude = magnitude
-        guard let aggregator else { return }
+        guard let aggregator, let start = startDate else { return }
         let finalized = aggregator.ingest(magnitude: magnitude, at: timestamp)
-        guard !finalized.isEmpty, let start = startDate else { return }
+        guard !finalized.isEmpty else { return }
         for epoch in finalized {
-            rawEpochs.append((epoch.index, epoch.activity,
-                              start.addingTimeInterval(Double(epoch.index) * epochLength)))
+            appendEpoch(index: epoch.index, activity: epoch.activity, sessionStart: start)
         }
         liveState = classify(rawEpochs.map { $0.activity }).last ?? .awake
+        checkpoint()   // persist progress every epoch (~once a minute)
+    }
+
+    private func appendEpoch(index: Int, activity: Double, sessionStart: Date) {
+        rawEpochs.append(RawEpoch(index: index, activity: activity,
+                                  start: sessionStart.addingTimeInterval(Double(index) * epochLength)))
+    }
+
+    private func checkpoint() {
+        guard isTracking, let start = startDate else { return }
+        store.saveActive(ActiveSleepSession(id: sessionID, start: start, epochLength: epochLength,
+                                            micEnabled: micEnabled, epochs: rawEpochs,
+                                            soundEvents: soundEvents))
     }
 
     private func tick() {
@@ -158,7 +238,7 @@ final class SleepTracker: ObservableObject {
         }
         let metrics = SleepMetricsCalculator.metrics(epochs: epochs, epochLength: epochLength,
                                                       soundEvents: soundEvents)
-        return SleepSession(start: start, end: end, epochLength: epochLength,
+        return SleepSession(id: sessionID, start: start, end: end, epochLength: epochLength,
                             epochs: epochs, soundEvents: soundEvents, metrics: metrics)
     }
 

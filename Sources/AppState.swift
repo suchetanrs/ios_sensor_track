@@ -52,6 +52,10 @@ final class AppState: ObservableObject {
     init() {
         load()
         token = Keychain.get() ?? ""
+        // Resume syncing automatically if it was running when the app was last closed.
+        if UserDefaults.standard.bool(forKey: "running"), settings.isValid, !token.isEmpty {
+            start()
+        }
     }
 
     // MARK: - Persistence
@@ -124,6 +128,7 @@ final class AppState: ObservableObject {
         location.requestAuth()
         location.start()
         isRunning = true
+        UserDefaults.standard.set(true, forKey: "running")
         status = "Running"
         addLog("Sync started (every 30s; background via location keep-alive).")
         scheduleTimer()
@@ -134,6 +139,7 @@ final class AppState: ObservableObject {
         timer?.invalidate(); timer = nil
         location.stop()
         isRunning = false
+        UserDefaults.standard.set(false, forKey: "running")
         status = "Stopped"
         addLog("Sync stopped.")
     }

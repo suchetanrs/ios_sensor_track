@@ -35,6 +35,16 @@ final class SleepEngineTests: XCTestCase {
         XCTAssertEqual(finalized[1].activity, 0, "the skipped epoch had no movement")
     }
 
+    func testAggregatorResumesFromStartIndex() {
+        // A recovered session keeps numbering where it left off, regardless of the new
+        // sample timestamps (which restart from an arbitrary monotonic base).
+        let agg = EpochAggregator(epochLength: 10, deadband: 0, startIndex: 42)
+        _ = agg.ingest(magnitude: 1, at: 1000)        // sets the new time base
+        let finalized = agg.ingest(magnitude: 1, at: 1010)  // one epoch later
+        XCTAssertEqual(finalized.map(\.index), [42])
+        XCTAssertEqual(agg.finish()?.index, 43)
+    }
+
     // MARK: ColeKripkeClassifier
 
     func testColeKripkeStillnessIsAsleep() {

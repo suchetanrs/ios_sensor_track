@@ -86,7 +86,12 @@ Obsidian sync.
   classifier flags **snoring/breathing** on-device (nothing is recorded or uploaded).
   The active audio session also keeps the app alive overnight with the screen locked.
 - **Background.** Mic off → keep the app open (the screen stays on). Mic on → the screen
-  can lock; the `audio` background mode keeps tracking alive.
+  can lock; the `audio` background mode keeps tracking alive. **Force-quitting** the app
+  (swiping it away in the app switcher) stops tracking — iOS does not relaunch a
+  force-quit app, so don't swipe it away overnight.
+- **Crash/kill recovery.** The in-progress night is checkpointed to disk every epoch
+  (`active-session.json`). If the app is terminated, the next launch recovers the
+  session and resumes it; the time the app was dead is filled as still/asleep epochs.
 - **Output.** Each night is saved on-device (`Documents/SleepSessions/`) with a
   **hypnogram** (Swift Charts), sleep efficiency, onset latency, WASO, awakenings, and
   snore minutes. Sessions are also written to **Apple Health** (`sleepAnalysis`).
